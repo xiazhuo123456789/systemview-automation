@@ -1,0 +1,18 @@
+{
+  "_comment": "Coordinates for SystemView 5.0 Build 046 at 1920x1080 / 125% scaling, window positioned at (-10,-10,1930,1030). Re-measure with `python sv.py list` and `python token_status.py` if your layout differs.",
+  "exe": "E:\\SYSTEMVIEW\\SysVu_32.exe",
+  "title_recent": "Recent SystemView Files",
+  "title_open": "Open SystemView File",
+  "title_param": "FM/VCO",
+  "title_analysis": "SystemView Analysis",
+  "tokens": {
+    "0": [142, 468],
+    "1": [381, 477],
+    "5": [264, 477],
+    "7": [490, 575]
+  },
+  "menu_file": [21, 37],
+  "menu_open_existing": [110, 177],
+  "param_ok_fallback": [1046, 640],
+  "crop_w2": [18, 690, 940, 1035]
+}
