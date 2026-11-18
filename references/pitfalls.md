@@ -90,8 +90,8 @@
 ---
 
 # 以下是"自动化会伤到别人"的三条硬教训
-
 ## 15. SystemView 是单实例，`--no-launch` 也保不了你
+
 
 **症状**：新起一个 `SysVu_32.exe`，在它弹出的 `Open SystemView File` 里按"打开"，
 结果文件被装进了**已经在运行的那个窗口**，别人正在编辑的图被换掉。
@@ -121,4 +121,43 @@
 
 > 以上三条都是真事故：文件 SHA256 前后一致（磁盘没坏），但用户内存里的窗口视图全丢了。
 > 自动化的边界就画在这里——**能读、能跑、能截图的都做，能"关"的一律不做**。
+
+---
+
+# 以下是"参数化"这一层踩到的四条（2026-11 补）
+
+## 18. 参数分组标题是 `ThunderRT6Frame`，不是 `Label`
+
+**症状**：`WARNING: no text box for 'Mod Gain'`，只写进去 Amplitude。
+**原因**：FM/VCO 对话框里每个参数组的标题是 **`ThunderRT6Frame` 的 caption**
+（`'Amplitude (v)'`、`'Mod Gain (Hz/v)'`…），文本框 `ThunderRT6TextBox id=21 'Text1'`
+落在该 Frame 的矩形内部；只按 `Static`/`ThunderRT6Label` 找标签永远找不到。
+**解法**：`profile.field_edit()` 同时接受 Frame 作标签——先找 caption 匹配的 Frame，
+再取矩形**落在该 Frame 内**的 `Edit`/`ThunderRT6TextBox`。
+
+## 19. `text~=OK` 会命中 `Apply to tokens`
+
+**症状**：四个字段写进去了，但对话框永不关闭，四种点法（`BM_CLICK`、`SendMessage
+WM_COMMAND`、`PostMessage WM_COMMAND`、真实鼠标）全部无效——因为它们都打在
+**`ThunderRT6Frame 'Apply to tokens'`** 上（"t**ok**ens" 含 "ok"）。
+**解法**：`pick()` 的 `text~=` 分支**精确 caption 优先**，子串命中只作兜底。
+另有一个纯手误要记住：切片长度必须写 `spec[len("text~="):]`，
+写成 `spec[7:]` 会把 `OK` 切成 `k`，于是"精确优先"永远不触发。
+
+## 20. 点 `OK` 前必须让对话框自己成为前台窗口
+
+**症状**：按钮选对了，`BM_CLICK` 发过去了，对话框还是不动。
+**原因**：`step_params` 为了点准画布把设计窗设成了 `HWND_TOPMOST`，
+模态对话框被压在下层；此时合成鼠标点击落在画布上，而 `WM_COMMAND` 对 VB6 按钮无效。
+**解法**：**先 `sv.focus(dlg_hwnd)` 把对话框抬到前台**，再 `PostMessage(btn, BM_CLICK)`；
+随后若对话框仍在，再补一次真实点击它的中心。实测此顺序下 `BM_CLICK` 立即生效。
+
+## 21. `maximize()` 分析窗会丢掉 w2 的缩放
+
+**症状**：截图里 `w2` 从 43.7–47.7 ms 退回 0–1.2 s，已调波的疏密看不见了。
+**原因**：分析窗开着 `Auto Replot On Window Size Change`（Plots 选项卡），
+尺寸一变就把所有图重算回全时域；**换参数重跑（Shift+F5）同样会重画回全程**。
+**解法**：截图时用 `sv.hold_front()` 抬窗而**不要 resize**；需要时间窗时在跑完之后
+再用橡皮筋框选（`--zoom`），或让 profile 的 `capture.zoom` 生效。
+
 

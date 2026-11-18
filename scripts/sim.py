@@ -40,6 +40,8 @@ from sv import click, drag, find, key, shot, user32  # noqa: E402
 
 WM_SETTEXT = 0x000C
 BM_CLICK = 0x00F5
+WM_COMMAND = 0x0111
+BN_CLICKED = 0
 VK_F5 = 0x74
 VK_SHIFT = 0x10
 
@@ -181,7 +183,7 @@ def step_launch(cfg: dict, log, want: str = ""):
     if recent:
         log("startup: Recent dialog -> Existing...")
         btn = next((c for c in children(recent["hwnd"])
-                    if c["cls"] == "Button" and "Existing" in c["text"]), None)
+                    if "Existing" in c["text"]), None)
         if btn:
             user32.SendMessageW(btn["hwnd"], BM_CLICK, 0, 0)
             time.sleep(0.8)
@@ -229,7 +231,7 @@ def step_open(cfg: dict, path: str, log, want: str = "") -> int:
     prompt = wait_window("Do you want to save changes", 1.5)
     if prompt:
         kids = children(prompt["hwnd"])
-        no = next((c for c in kids if c["cls"] == "Button" and c["text"].startswith("否")), None)
+        no = next((c for c in kids if c["text"].startswith("否")), None)
         if no:
             user32.SendMessageW(no["hwnd"], BM_CLICK, 0, 0)
             time.sleep(1.4)
@@ -281,16 +283,38 @@ def step_params(cfg: dict, values: dict, log, want: str = "") -> int:
     tx, ty = point
     dx, dy = (open_by.get("menu_offset") or [44, 8])[:2]
 
-    sv.focus(win["hwnd"])
+    # NB: focus() calls ShowWindow(SW_RESTORE), which would undo the maximised
+    # canvas and silently invalidate every profile token coordinate.
+    sv.maximize(win["hwnd"])
     sv.hold_front(win["hwnd"])
     try:
+        # A dialog left open by an earlier, failed run would otherwise be
+        # mistaken for the one this run opens.
+        stale = sv.find(cfg["title_param"])
+        if stale:
+            log(f"  closing stale {cfg['title_param']} dialog")
+            sv.focus(stale[0]["hwnd"])
+            sv.key(0x1B)                  # Esc = Cancel, never saves
+            time.sleep(0.5)
         click(tx, ty)
         click(tx, ty, button="right")
         time.sleep(0.5)
         click(tx + dx, ty + dy)          # "Edit Parameters..." — first menu item
         dlg = wait_window(cfg["title_param"], 6)
         if not dlg:
+            # Turn an opaque miss into something the operator can act on: the
+            # screenshot shows where the canvas actually is, and the hint names
+            # the tool that re-measures the token coordinates.
+            shot = os.path.join(os.environ.get("TEMP", "."), "sv_params_miss.png")
+            try:
+                sv.shot(shot)
+            except Exception:
+                shot = "(screenshot failed)"
             log(f"ERROR: {cfg['title_param']} dialog not found")
+            log(f"  canvas screenshot: {shot}")
+            log("  the profile's token coordinates assume a maximised, "
+                "unscrolled canvas; re-measure them with "
+                "`python scripts/token_status.py \"SystemView - \" out.png X Y ...`")
             return 4
         kids = children(dlg["hwnd"])
         written = 0
@@ -320,7 +344,18 @@ def step_params(cfg: dict, values: dict, log, want: str = "") -> int:
         log(f"param dialog: {written} field(s) written")
         btn = profiles.pick(children(dlg["hwnd"]), pd.get("ok") or "text~=OK")
         if btn:
-            user32.SendMessageW(btn["hwnd"], BM_CLICK, 0, 0)
+            # The design window is held TOPMOST, so a synthetic mouse click on
+            # the dialog can land on the canvas instead. Raise the dialog first,
+            # then post BM_CLICK to the button itself (verified to work only
+            # once the dialog is the foreground window).
+            sv.focus(dlg["hwnd"])
+            time.sleep(0.3)
+            user32.PostMessageW(btn["hwnd"], BM_CLICK, 0, 0)
+            time.sleep(0.8)
+            if sv.find(cfg["title_param"]):
+                click((btn["rect"][0] + btn["rect"][2]) // 2,
+                      (btn["rect"][1] + btn["rect"][3]) // 2)
+                time.sleep(0.5)
         else:
             click(*cfg["param_ok_fallback"])
         time.sleep(0.7)
@@ -355,19 +390,40 @@ def step_run(cfg: dict, out_dir: str, timeout: float, log, want: str = "") -> in
 def step_capture(cfg: dict, out_dir: str, tag: str, zoom, log):
     os.makedirs(out_dir, exist_ok=True)
     full = os.path.join(out_dir, f"{tag}-full.png")
-    shot(full)
-    made = [full]
-    if zoom:
+    # Raise the analysis window first: a full-screen grab would otherwise record
+    # whatever the user happened to have in front, and the crop below would cut
+    # the wrong pixels.
+    win = find(cfg["title_analysis"])
+    if win:
+        # Raise without resizing: SystemView re-scales every plot when the
+        # analysis window changes size ("Auto Replot On Window Size Change"),
+        # which would throw away the saved zoom on w2.
+        sv.hold_front(win[0]["hwnd"])
+        time.sleep(0.6)
         win = find(cfg["title_analysis"])
+    try:
+        shot(full)
+    finally:
         if win:
-            sv.focus(win[0]["hwnd"])
-            time.sleep(0.4)
-            l, t, r, b = cfg["crop_w2"]
-            x0, y0 = int(l + 60), int(t + 95)
-            x1, y1 = int(r - 20), int(b - 90)
-            drag(x0, y0, x1, y1)
-            time.sleep(1.2)
-            shot(full)
+            sv.release_front(win[0]["hwnd"])
+    made = [full]
+    if zoom and win:
+        l, t, r, b = cfg["crop_w2"]
+        x0, y0 = int(l + 60), int(t + 95)
+        x1, y1 = int(r - 20), int(b - 90)
+        drag(x0, y0, x1, y1)
+        time.sleep(1.2)
+        shot(full)
+    if win:
+        box = tuple(win[0]["rect"])
+        crop = os.path.join(out_dir, f"{tag}.png")
+        try:
+            from PIL import Image
+            with Image.open(full) as im:
+                im.crop(box).save(crop)
+            made.append(crop)
+        except Exception as exc:                      # pragma: no cover
+            log(f"  WARNING: crop failed ({exc}); keeping the full screenshot")
     log(f"captured: {full}")
     return made
 
@@ -441,27 +497,29 @@ def main(argv=None) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
+    fail_rc = 0
     try:
         if not args.no_launch:
-            rc = step_launch(cfg, log, want)
-            if rc:
-                return rc
-        rc = step_open(cfg, path, log, want)
-        if rc:
-            return rc
-        rc = step_params(cfg, values, log, want)
-        if rc:
-            return rc
-        rc = step_run(cfg, args.out, args.timeout, log, want)
-        if rc:
-            return rc
-        tag = os.path.splitext(os.path.basename(path))[0]
-        result["images"] = step_capture(cfg, args.out, tag, zoom, log)
-        result["ok"] = True
+            fail_rc = step_launch(cfg, log, want) or 0
+        if not fail_rc:
+            fail_rc = step_open(cfg, path, log, want) or 0
+        if not fail_rc:
+            fail_rc = step_params(cfg, values, log, want) or 0
+        if not fail_rc:
+            fail_rc = step_run(cfg, args.out, args.timeout, log, want) or 0
+        if not fail_rc:
+            tag = os.path.splitext(os.path.basename(path))[0]
+            result["images"] = step_capture(cfg, args.out, tag, zoom, log)
+            result["ok"] = True
+        else:
+            result["error"] = lines[-1] if lines else f"step failed ({fail_rc})"
     finally:
         result["elapsed_s"] = round(time.time() - started, 1)
 
+    # `--json` must always hand back a parseable object, including on failure
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    if fail_rc:
+        return fail_rc
     return 0 if result["ok"] else 5
 
 

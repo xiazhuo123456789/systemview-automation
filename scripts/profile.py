@@ -105,8 +105,15 @@ def pick(controls: list[dict], spec: str | None) -> dict | None:
         return None
     spec = spec.strip()
     if spec.startswith("text~="):
-        needle = spec[6:].lower()
-        return next((c for c in controls if needle in _text(c).lower()), None)
+        want = spec[len("text~="):].strip().lower()
+        hits = [c for c in controls if want in _text(c).lower()]
+        if not hits:
+            return None
+        # "OK" is a substring of "Apply to tokens", so an exact caption always
+        # wins over a merely containing one. Without this, a dialog that groups
+        # its fields under "Apply to tokens" swallows every OK click.
+        exact = [c for c in hits if _text(c).strip().lower() == want]
+        return exact[0] if exact else hits[0]
     if spec.startswith("text="):
         want = spec[5:].strip().lower()
         return next((c for c in controls if _text(c).lower() == want), None)
@@ -127,32 +134,60 @@ def pick(controls: list[dict], spec: str | None) -> dict | None:
     raise ValueError(f"bad selector: {spec!r}")
 
 
+def _inside(inner, outer, pad=0) -> bool:
+    x0, y0, x1, y1 = inner
+    a0, b0, a1, b1 = outer
+    return (x0 >= a0 - pad and y0 >= b0 - pad
+            and x1 <= a1 + pad and y1 <= b1 + pad)
+
+
+def _area(r) -> int:
+    return max(0, r[2] - r[0]) * max(0, r[3] - r[1])
+
+
 def field_edit(controls: list[dict], label: str) -> dict | None:
     """Find the text box that belongs to a labelled field.
 
-    SystemView lays device dialogs out as *label to the left, edit to the
-    right* (sometimes label above, edit below). So: find the Static whose text
-    starts with `label`, then take the nearest Edit that sits to its right on
-    roughly the same row, else the first Edit below it.
+    Two layouts are in use, and SystemView uses both in the same dialog family:
+
+    * **label to the left, edit to the right** (sometimes label above, edit
+      below) - the label is a ``Static``/``ThunderRT6Label``.
+    * **group frame whose caption IS the label** - e.g. the FM/VCO dialog draws
+      a ``ThunderRT6Frame`` captioned ``'Amplitude (v)'`` and puts the
+      ``ThunderRT6TextBox`` inside it. VB6 frames are real containers, so the
+      edit is geometrically inside the frame rectangle.
+
+    Static labels win when both exist, because a frame can be large enough to
+    swallow several edits.
     """
     label = label.strip().lower()
+    edits = [c for c in controls
+             if c.get("cls") in ("Edit", "ThunderRT6TextBox")]
+
     statics = [c for c in controls
                if c.get("cls") in ("Static", "ThunderRT6Label")
                and _text(c).lower().startswith(label)]
-    edits = [c for c in controls
-             if c.get("cls") in ("Edit", "ThunderRT6TextBox")]
-    if not statics:
+    if statics:
+        lab = statics[0]
+        lx0, ly0, lx1, ly1 = lab["rect"]
+        row_slack = max(12, (ly1 - ly0))
+        right = [e for e in edits
+                 if e["rect"][0] >= lx0 and abs(e["rect"][1] - ly0) <= row_slack]
+        if right:
+            return min(right, key=lambda e: (abs(e["rect"][1] - ly0), e["rect"][0]))
+        below = [e for e in edits if e["rect"][1] > ly1]
+        if below:
+            return min(below, key=lambda e: e["rect"][1])
         return None
-    lab = statics[0]
-    lx0, ly0, lx1, ly1 = lab["rect"]
-    row_slack = max(12, (ly1 - ly0))
-    right = [e for e in edits
-             if e["rect"][0] >= lx0 and abs(e["rect"][1] - ly0) <= row_slack]
-    if right:
-        return min(right, key=lambda e: (abs(e["rect"][1] - ly0), e["rect"][0]))
-    below = [e for e in edits if e["rect"][1] > ly1]
-    if below:
-        return min(below, key=lambda e: e["rect"][1])
+
+    frames = [c for c in controls
+              if c.get("cls") in ("ThunderRT6Frame", "ThunderRT6FormDC")
+              and _text(c).lower().startswith(label)]
+    for frame in frames:
+        inner = [e for e in edits if _inside(e["rect"], frame["rect"])]
+        if inner:
+            # smallest containing edit = the field's own box
+            return min(inner, key=lambda e: _area(e["rect"]))
     return None
 
 

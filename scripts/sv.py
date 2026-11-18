@@ -19,6 +19,7 @@ GWL_STYLE = -16
 WS_MAXIMIZE = 0x01000000
 SW_HIDE = 0
 SW_SHOW = 5
+SW_MAXIMIZE = 3
 SW_RESTORE = 9
 HWND_TOPMOST = -1
 HWND_NOTOPMOST = -2
@@ -109,6 +110,11 @@ def bring_to_front(hwnd):
 
 
 def maximize(hwnd, w=1930, h=1030):
+    """Fill the screen. Tries the MDI-native maximize first: SystemView's design
+    canvas is an MDI child, and SetWindowPos alone leaves it floating at the
+    saved size, which silently invalidates every profile token coordinate."""
+    user32.ShowWindow(hwnd, SW_MAXIMIZE)
+    time.sleep(0.35)
     user32.SetWindowPos(hwnd, 0, -10, -10, w, h, 0x0040)
     bring_to_front(hwnd)
     time.sleep(0.4)
