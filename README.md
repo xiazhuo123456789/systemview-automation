@@ -27,6 +27,12 @@ this script — six windows, and `w2: Sink 11` is the FM wave itself):
 
 ![six analysis windows](examples/调频演示-可见已调波-full.png)
 
+A run with parameters changed (`--set carrier=1500 --set mod_gain=60`) produces
+`examples/调频演示-参数化-1500Hz.png`; note the 1.5 kHz carrier line in the
+spectrum instead of the default 5 kHz:
+
+![parameterised run](examples/调频演示-参数化-1500Hz.png)
+
 ## Why this exists
 
 SystemView is still used for 通信原理 / 信号与系统 coursework, but it cannot be
@@ -135,6 +141,10 @@ the screen to stop changing instead of trusting the clock.
 | dialog found but text not written | wrong handle (searched another dialog) | `openfile.py dump "<title>"`, pick the edit with `*.svu` |
 | parameter silently reverted | submitted via Source Library's OK | edit through right-click → `Edit Parameters…` |
 | plots look identical after a change | `Ctrl+D` doesn't recompute | use `Shift+F5` (`Run System and Auto Plot`) |
+| `WARNING: no text box for 'Mod Gain'` | the group heading is a `ThunderRT6Frame`, not a `Label` | keep `field_edit`'s frame-caption branch (pitfalls §18) |
+| dialog stays open although fields were written | the OK hit matched `Apply to tokens` | exact-caption wins in `profile.pick` (pitfalls §19) |
+| `BM_CLICK` on OK does nothing | the TOPMOST design window swallows it | raise the dialog first (pitfalls §20) |
+| `w2` lost its zoom after capturing | the analysis window was resized | raise with `hold_front`, don't resize (pitfalls §21) |
 
 More, with symptoms and root causes: `references/pitfalls.md`.
 
