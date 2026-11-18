@@ -177,3 +177,31 @@ SystemView 打印 `Releasing resources and closing SystemView...` 后整体退�
 一个 `Recent SystemView Files` + 一个 0 尺寸 `ThunderRT6Main`"。
 
 
+
+## 23. 分析窗里的图可能还是上一次的——它不会自己刷新
+
+**现象**：`.svu` 明明有语音源、链路也没坏，可 `w1`（输入话音）的纵轴只有
+`127–129`，`w0/w2/w4/w5` 全是贴着 128 的一条实线；`sim.py` 还会报
+`WARNING: plots never settled; capturing anyway`。截图看起来"有图"，其实是空数。
+
+**原因**：`SystemView Analysis` 窗口只是**容器**，里面的 `w0…w5` 是上一次运行
+留下的旧曲线。真正让它重画的是打开文档时那个模态框：
+
+```
+<文件>.svu
+This system has an automated Sink Calculator sequence.
+Do you want SystemView to perform the sequence?
+[&Yes] [Cancel] [&No]
+```
+
+点 `No`（或根本不点）→ 窗口保留旧图；点 **`Yes`** → SystemView 跑完它自带的
+Sink Calculator 序列，六个子窗按**本次**数据重画（`w3` 叠加图立刻回到 `60–180`
+的正常话音幅度）。
+
+**解法**：
+1. 用 `Ctrl+O` 打开 `.svu` 后，**先把这个框点 `Yes`**（按钮文本 `&Yes`，可用
+   `PostMessageW(btn, BM_CLICK)` 触发）；
+2. 判断"是不是新图"别看有没有曲线，看**纵轴量程**：输入话音应当是 `0–255`
+   或 `±100` 这个量级，`127–129` 一定意味着"没信号/旧图"；
+3. `w3` 的叠加图（青=输入 `w1`、绿=接收 `w0`）是唯一能一眼看出
+   "解调对不对"的图：两条曲线应当基本重合；只看到一坨实心色块就说明量程错了。

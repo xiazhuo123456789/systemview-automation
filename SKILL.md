@@ -1,4 +1,4 @@
----
+﻿---
 name: systemview-automation
 description: Drive ELANIX SystemView 5.0 (.svu) on Windows from the command line — open a system, read every token's type and connections, edit device parameters, run the simulation, and capture the plot windows as PNG. Use when a task involves SystemView simulations (通信原理/调频/频谱实验, .svu files, SysVu_32.exe), when a screenshot of a SystemView result must be reproduced or explained, or when someone asks for an FM/QAM/audio-processing simulation figure produced by the real desktop tool rather than by a plotting script. Agent-agnostic: a plain CLI any agent or shell can call, no vendor SDK.
 license: MIT
@@ -72,7 +72,7 @@ call reliable and to explain what the resulting picture can and cannot prove.
 | `scripts/token_status.py` | batch-read token types off the status bar |
 | `references/layout.md` | token map, coordinates, window semantics |
 | `references/params.md` | dialog fields, math, "can you see FM" criteria |
-| `references/pitfalls.md` | 22 failure modes with fixes |
+| `references/pitfalls.md` | 23 failure modes with fixes |
 | `references/versions.md` | other machines/versions: the 5-step self-check (no version pinning) |
 | `docs/integrations.md` | how any agent (CLI / skills dir / MCP) plugs in |
 | `screenshots/` | what a real `sim.py` run produces (used by `README.md`) |
