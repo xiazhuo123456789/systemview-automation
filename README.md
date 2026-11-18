@@ -55,18 +55,37 @@ SystemView 至今仍被用在 **通信原理 / 信号与系统** 的课程设计
 `python scripts/sv.py list` 和 `python scripts/token_status.py`，再按实际位置调整——
 凡是程序允许的地方，每次点击都是现测的。
 
-## 安装
+## 安装：不绑定任何一家智能体
 
-按 Agent Skills 的目录规范放进去，靠目录名被发现：
+**它本质上只是三个 Python 脚本 + 一份说明。** 没有 SDK、没有账号、没有专有协议，
+所以任何能执行命令的智能体都能用（Claude Code、Codex CLI、Cursor、Cline、
+Windsurf、Gemini CLI、Aider、自研 agent、CI 机器人，或者你自己开一个终端）。
 
 ```bash
-# 个人级
-git clone <本仓库> ~/.claude/skills/systemview-automation
-# 或项目级
-cp -r systemview-automation <project>/.claude/skills/
+git clone https://github.com/xiazhuo123456789/systemview-automation.git
+cd systemview-automation
+pip install -r requirements.txt
+
+# 够用了：不需要"装"，直接跑
+python scripts/sim.py --file "D:\lab\demo.svu" --out out\ --json
 ```
 
-目录名必须保持 `systemview-automation`：frontmatter 里的 `name` 必须与父目录同名。
+如果你用的运行时支持 **Agent Skills** 目录规范（`SKILL.md` + frontmatter，靠
+`description` 触发），把这个目录放进它的 skills 目录即可，**目录名必须保持
+`systemview-automation`**（规范要求 `name` 与父目录同名）：
+
+```bash
+# Claude Code：个人级 / 项目级
+git clone <本仓库> ~/.claude/skills/systemview-automation
+cp -r systemview-automation <project>/.claude/skills/
+
+# 其它运行时（Codex CLI / Cursor / Cline / 自研）请按各自约定放置；
+# 即使完全不认 SKILL.md，也只要对它说一句"先读 SKILL.md，按里面的命令执行"。
+```
+
+想包成 function calling / MCP / LangChain tool，见
+[`docs/integrations.md`](docs/integrations.md)：三层接入方式（纯 CLI → Skills 目录
+→ 函数封装）和一份现成的 JSON schema，适配层通常 20 行以内。
 
 ## 用法
 
@@ -168,7 +187,9 @@ python scripts/sim.py --file my.svu --set carrier=5000 --out out
 `SystemView` · `ELANIX SystemView 5.0` · `SysVu_32` · `.svu` · `通信原理课程设计` ·
 `调频` / `FM modulation` · `信号与系统 仿真` · `仿真自动化` · `GUI automation` ·
 `Windows GUI RPA` · `PyAutoGUI alternative` · `pywinauto alternative` ·
-`no-COM legacy app automation` · `agent skill` · `Claude Skill`
+`no-COM legacy app automation` · `agent skill` · `agent-agnostic` · `SKILL.md` ·
+`Claude Code` · `Codex CLI` · `Cursor` · `Cline` · `Gemini CLI` · `MCP tool` ·
+`function calling` · `LLM tool use`
 
 ## 限制
 

@@ -1,8 +1,8 @@
 ---
 name: systemview-automation
-description: Drive ELANIX SystemView 5.0 (.svu) on Windows from the command line — open a system, read every token's type and connections, edit device parameters, run the simulation, and capture the plot windows as PNG. Use when a task involves SystemView simulations (通信原理/调频/频谱实验, .svu files, SysVu_32.exe), when a screenshot of a SystemView result must be reproduced or explained, or when someone asks for an FM/QAM/audio-processing simulation figure produced by the real desktop tool rather than by a plotting script.
+description: Drive ELANIX SystemView 5.0 (.svu) on Windows from the command line — open a system, read every token's type and connections, edit device parameters, run the simulation, and capture the plot windows as PNG. Use when a task involves SystemView simulations (通信原理/调频/频谱实验, .svu files, SysVu_32.exe), when a screenshot of a SystemView result must be reproduced or explained, or when someone asks for an FM/QAM/audio-processing simulation figure produced by the real desktop tool rather than by a plotting script. Agent-agnostic: a plain CLI any agent or shell can call, no vendor SDK.
 license: MIT
-compatibility: Windows 10/11, 1920x1080 at 125% scaling, Python 3.10+ with Pillow, SystemView 5.0 installed at E:\SYSTEMVIEW\SysVu_32.exe. Needs an interactive desktop session; it clicks real windows.
+compatibility: Windows 10/11, 1920x1080 at 125% scaling, Python 3.10+ with Pillow, SystemView 5.0 installed at E:\SYSTEMVIEW\SysVu_32.exe. Needs an interactive desktop session; it clicks real windows. Agent-agnostic: any runtime that can run a shell command (Claude Code, Codex CLI, Cursor, Cline, Gemini CLI, custom/MCP) can drive it; nothing here depends on one vendor's SDK.
 metadata:
   version: "2.0.0"
   author: 夏卓
