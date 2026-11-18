@@ -34,6 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import openfile  # noqa: E402  (local module, must come after sys.path tweak)
+import profile as profiles  # noqa: E402
 import sv  # noqa: E402
 from sv import click, drag, find, key, shot, user32  # noqa: E402
 
@@ -54,7 +55,36 @@ DEFAULTS = {
     "menu_open_existing": [110, 177],
     "param_ok_fallback": [1046, 640],
     "crop_w2": [18, 690, 940, 1035],
+    "systems_dir": os.path.join(os.path.dirname(HERE), "systems"),
 }
+
+
+def apply_profile(cfg: dict, prof: dict | None) -> dict:
+    """Fold a system profile into the runtime config (profile wins).
+
+    Only three things change: which dialog to open, where the tokens are, and
+    how the result is cropped. Everything else stays in DEFAULTS, so a profile
+    never has to repeat machine-specific settings.
+    """
+    if not prof:
+        return cfg
+    cfg = json.loads(json.dumps(cfg))
+    for name, tok in (prof.get("tokens") or {}).items():
+        cfg["tokens"][name] = list(tok["at"])
+        cfg["tokens"].setdefault(str(tok.get("id", "")), list(tok["at"]))
+    pd = prof.get("param_dialog") or {}
+    if pd.get("title"):
+        cfg["title_param"] = pd["title"]
+    if pd:
+        cfg["param_dialog"] = pd
+    cap = prof.get("capture") or {}
+    if cap.get("window"):
+        cfg["crop_w2"] = list(cap["window"])
+    if cap.get("zoom"):
+        cfg["default_zoom"] = list(cap["zoom"])
+    cfg["profile_name"] = prof.get("name")
+    return cfg
+
 
 
 # ---------------------------------------------------------------- helpers
@@ -213,49 +243,89 @@ def step_open(cfg: dict, path: str, log, want: str = "") -> int:
 
 
 def _ordered_edits(dlg_hwnd):
-    """Return the dialog's text boxes ordered top-left -> bottom-right."""
+    """Return the dialog's text boxes ordered top-left -> bottom-right.
+
+    Only used by the legacy positional fallback: it assumes a specific device
+    dialog (FM/VCO). Profiles avoid it entirely.
+    """
     edits = [c for c in children(dlg_hwnd) if c["cls"] in ("Edit", "ThunderRT6TextBox")]
     edits.sort(key=lambda c: (c["rect"][1] // 40, c["rect"][0]))
     return edits
 
 
-def step_params(cfg: dict, carrier, mod_gain, amplitude, log, want: str = "") -> int:
-    if carrier is None and mod_gain is None and amplitude is None:
+PARAM_ORDER_LEGACY = ("amplitude", "mod_gain", "carrier", "phase")
+
+
+def step_params(cfg: dict, values: dict, log, want: str = "") -> int:
+    """Write parameter values into the device dialog.
+
+    `values` maps a profile field name (``carrier``, ``mod_gain`` …) to a
+    number or string. With a system profile the field is located by its label
+    text, which is layout-independent; without one the four FM/VCO boxes are
+    taken in reading order.
+    """
+    values = {k: v for k, v in (values or {}).items() if v is not None}
+    if not values:
         return 0
     win = design_window(cfg, want)
     if not win:
         log("ERROR: no design window")
         return 2
+    pd = cfg.get("param_dialog") or {}
+    open_by = pd.get("open_by") or {}
+    token_name = open_by.get("token", "1")
+    point = cfg["tokens"].get(str(token_name)) or cfg["tokens"].get(token_name)
+    if not point:
+        log(f"ERROR: unknown token {token_name!r} for Edit Parameters")
+        return 4
+    tx, ty = point
+    dx, dy = (open_by.get("menu_offset") or [44, 8])[:2]
+
     sv.focus(win["hwnd"])
     sv.hold_front(win["hwnd"])
-    tx, ty = cfg["tokens"]["1"]
-    click(tx, ty)
-    click(tx, ty, button="right")
-    time.sleep(0.5)
-    click(tx + 44, ty + 8)          # "Edit Parameters..." first menu item
-    dlg = wait_window(cfg["title_param"], 6)
-    if not dlg:
-        log("ERROR: FM/VCO dialog not found")
+    try:
+        click(tx, ty)
+        click(tx, ty, button="right")
+        time.sleep(0.5)
+        click(tx + dx, ty + dy)          # "Edit Parameters..." — first menu item
+        dlg = wait_window(cfg["title_param"], 6)
+        if not dlg:
+            log(f"ERROR: {cfg['title_param']} dialog not found")
+            return 4
+        kids = children(dlg["hwnd"])
+        written = 0
+        for spec in pd.get("fields") or []:
+            name = spec.get("value")
+            if name not in values:
+                continue
+            box = profiles.field_edit(kids, spec.get("label", ""))
+            if not box:
+                log(f"  WARNING: no text box for {spec.get('label')!r}")
+                continue
+            text = profiles.fmt(values[name])
+            user32.SendMessageW(box["hwnd"], WM_SETTEXT, 0, text)
+            time.sleep(0.12)
+            written += 1
+            log(f"  {spec.get('label')} = {text}")
+        if not pd:
+            edits = _ordered_edits(dlg["hwnd"])
+            for name, box in zip(PARAM_ORDER_LEGACY, edits):
+                if name not in values:
+                    continue
+                text = profiles.fmt(values[name])
+                user32.SendMessageW(box["hwnd"], WM_SETTEXT, 0, text)
+                time.sleep(0.12)
+                written += 1
+                log(f"  {box['rect']} = {text}")
+        log(f"param dialog: {written} field(s) written")
+        btn = profiles.pick(children(dlg["hwnd"]), pd.get("ok") or "text~=OK")
+        if btn:
+            user32.SendMessageW(btn["hwnd"], BM_CLICK, 0, 0)
+        else:
+            click(*cfg["param_ok_fallback"])
+        time.sleep(0.7)
+    finally:
         sv.release_front(win["hwnd"])
-        return 4
-    edits = _ordered_edits(dlg["hwnd"])
-    log(f"param dialog: {len(edits)} text boxes")
-    values = [amplitude, mod_gain, carrier, None]     # amp, gain, freq, phase
-    for box, val in zip(edits, values):
-        if val is None:
-            continue
-        text = f"{val:g}" if isinstance(val, float) else str(val)
-        user32.SendMessageW(box["hwnd"], WM_SETTEXT, 0, text)
-        time.sleep(0.12)
-        log(f"  set {box['rect']} = {text}")
-    btn = next((c for c in children(dlg["hwnd"])
-                if c["cls"] == "Button" and c["text"].strip().lower().startswith("ok")), None)
-    if btn:
-        user32.SendMessageW(btn["hwnd"], BM_CLICK, 0, 0)
-    else:
-        click(*cfg["param_ok_fallback"])
-    time.sleep(0.7)
-    sv.release_front(win["hwnd"])
     return 0
 
 
@@ -310,6 +380,11 @@ def main(argv=None) -> int:
     ap.add_argument("--carrier", type=float, help="FM/VCO Frequency (Hz)")
     ap.add_argument("--mod-gain", type=float, dest="mod_gain", help="FM/VCO Mod Gain (Hz/v)")
     ap.add_argument("--amplitude", type=float, help="FM/VCO Amplitude (v)")
+    ap.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
+                    help="profile field, e.g. --set carrier=5000 --set phase=90")
+    ap.add_argument("--profile", help="system profile JSON (default: auto-match systems/*.json)")
+    ap.add_argument("--print-profile", action="store_true",
+                    help="show the resolved profile and exit (no GUI)")
     ap.add_argument("--zoom", nargs=2, type=float, metavar=("X0", "X1"),
                     help="time window in seconds to zoom the modulated-wave plot")
     ap.add_argument("--timeout", type=float, default=45.0)
@@ -322,6 +397,27 @@ def main(argv=None) -> int:
     cfg = load_config(args.config)
     path = os.path.abspath(args.file)
     want = os.path.splitext(os.path.basename(path))[0]   # match window by file stem
+
+    prof = None
+    if args.profile:
+        prof = profiles.load(args.profile)
+    elif os.path.isdir(cfg["systems_dir"]):
+        prof = profiles.discover(cfg["systems_dir"], want)
+    cfg = apply_profile(cfg, prof)
+
+    values = profiles.parse_sets(args.set,
+                                 {"carrier": args.carrier,
+                                  "mod_gain": args.mod_gain,
+                                  "amplitude": args.amplitude})
+    zoom = args.zoom or cfg.get("default_zoom")
+
+    if args.print_profile:
+        print(json.dumps({"profile": prof, "tokens": cfg["tokens"],
+                          "param_dialog": cfg.get("param_dialog"),
+                          "values": values, "zoom": zoom},
+                         ensure_ascii=False, indent=2))
+        return 0
+
     started = time.time()
     lines = []
 
@@ -331,8 +427,8 @@ def main(argv=None) -> int:
             print(msg, flush=True)
 
     result = dict(ok=False, file=path, out=os.path.abspath(args.out),
-                  carrier=args.carrier, mod_gain=args.mod_gain,
-                  elapsed_s=0.0, images=[], messages=lines)
+                  profile=(prof or {}).get("name"),
+                  values=values, elapsed_s=0.0, images=[], messages=lines)
 
     if not os.path.exists(path):
         log(f"ERROR: file not found: {path}")
@@ -353,14 +449,14 @@ def main(argv=None) -> int:
         rc = step_open(cfg, path, log, want)
         if rc:
             return rc
-        rc = step_params(cfg, args.carrier, args.mod_gain, args.amplitude, log, want)
+        rc = step_params(cfg, values, log, want)
         if rc:
             return rc
         rc = step_run(cfg, args.out, args.timeout, log, want)
         if rc:
             return rc
         tag = os.path.splitext(os.path.basename(path))[0]
-        result["images"] = step_capture(cfg, args.out, tag, args.zoom, log)
+        result["images"] = step_capture(cfg, args.out, tag, zoom, log)
         result["ok"] = True
     finally:
         result["elapsed_s"] = round(time.time() - started, 1)

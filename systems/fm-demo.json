@@ -1,0 +1,33 @@
+{
+  "name": "fm-demo",
+  "match": ["调频演示", "fm_demo"],
+  "tokens": {
+    "source": {"id": 0, "at": [142, 468]},
+    "fm": {"id": 1, "at": [381, 477]},
+    "upsample": {"id": 5, "at": [264, 477]},
+    "noise": {"id": 7, "at": [490, 575]},
+    "adder": {"id": 6, "at": [498, 468]},
+    "delay": {"id": 8, "at": [596, 352]},
+    "mult": {"id": 9, "at": [602, 470]},
+    "lpf": {"id": 10, "at": [656, 477]},
+    "gain": {"id": 4, "at": [776, 477]},
+    "sink_out": {"id": 2, "at": [891, 477]},
+    "sink_in": {"id": 3, "at": [257, 352]},
+    "sink_mod": {"id": 11, "at": [318, 705]}
+  },
+  "param_dialog": {
+    "title": "FM/VCO",
+    "open_by": {"token": "fm", "menu_offset": [44, 8]},
+    "fields": [
+      {"label": "Amplitude", "value": "amplitude"},
+      {"label": "Mod Gain", "value": "mod_gain"},
+      {"label": "Frequency", "value": "carrier"},
+      {"label": "Phase", "value": "phase"}
+    ],
+    "ok": "text~=OK"
+  },
+  "capture": {
+    "window": [18, 690, 940, 1035],
+    "zoom": [0.0437, 0.0477]
+  }
+}

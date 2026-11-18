@@ -1,0 +1,30 @@
+{
+  "_comment": "Copy to <your-system>.json and fill in. Files starting with '_' are ignored by discovery. See docs/extending.md.",
+
+  "name": "your-system",
+  "match": ["your-svu-name", "窗标题片段"],
+
+  "tokens": {
+    "source":   { "id": 0, "at": [0, 0] },
+    "fm":       { "id": 1, "at": [0, 0] },
+    "noise":    { "id": 7, "at": [0, 0] },
+    "sink_mod": { "id": 11, "at": [0, 0] }
+  },
+
+  "param_dialog": {
+    "title": "FM/VCO",
+    "open_by": { "token": "fm", "menu_offset": [44, 8] },
+    "fields": [
+      { "label": "Amplitude", "value": "amplitude" },
+      { "label": "Mod Gain",  "value": "mod_gain"  },
+      { "label": "Frequency", "value": "carrier"   },
+      { "label": "Phase",     "value": "phase"     }
+    ],
+    "ok": "text~=OK"
+  },
+
+  "capture": {
+    "window": [18, 690, 940, 1035],
+    "zoom": [0.0437, 0.0477]
+  }
+}

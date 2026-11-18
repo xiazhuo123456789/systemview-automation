@@ -1,5 +1,10 @@
 # SystemView 5.0 automation
 
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4)](#requirements)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776ab)](requirements.txt)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Agent Skill](https://img.shields.io/badge/agent%20skill-SKILL.md-8a2be2)](SKILL.md)
+
 Drive **ELANIX SystemView 5.0** (the 1999 VB6 program `SysVu_32.exe`) from the
 command line: open a `.svu` system, read what each token is, change device
 parameters, run the simulation, and capture the plot windows as PNG.
@@ -9,7 +14,7 @@ the only way in: the program has no scripting interface and stores `.svu` as
 an opaque binary.
 
 ```
-python scripts/sim.py --file "E:\path\demo.svu" --carrier 5000 --mod-gain 30 --out out\
+python scripts/sim.py --file "E:\path\demo.svu" --set carrier=5000 --set mod_gain=30 --out out\
 ```
 
 ```
@@ -66,21 +71,28 @@ python scripts/sim.py --file "E:\通信原理课程设计\FM_SystemView\调频�
 
 # 2. change the carrier and modulation index first (this is what makes an FM
 #    waveform visible — see references/params.md)
+python scripts/sim.py --file demo.svu --set carrier=5000 --set mod_gain=30 --out out\
+
+# 2b. the legacy flags still work and mean the same thing
 python scripts/sim.py --file demo.svu --carrier 5000 --mod-gain 30 --out out\
 
 # 3. also zoom the modulated-wave plot to a few milliseconds
 python scripts/sim.py --file demo.svu --zoom 0.0437 0.0477 --out out\
 
-# 4. dry run / machine-readable
+# 4. dry run / machine-readable / show which profile matched
 python scripts/sim.py --file demo.svu --dry-run
 python scripts/sim.py --file demo.svu --json
+python scripts/sim.py --file demo.svu --print-profile
 ```
 
 | flag | meaning |
 |---|---|
 | `--file` | `.svu` to open (required) |
 | `--out` | output directory, default `out` |
-| `--carrier` / `--mod-gain` / `--amplitude` | rewrite FM/VCO before running |
+| `--set NAME=VALUE` | write a profile field before running; repeatable, works with any system profile |
+| `--profile` | explicit profile JSON (default: auto-match `systems/*.json`) |
+| `--print-profile` | print the resolved profile and exit — no GUI touched |
+| `--carrier` / `--mod-gain` / `--amplitude` | shorthand for `--set carrier=…`, kept for backward compatibility |
 | `--zoom X0 X1` | drag-select that time window in the plot |
 | `--timeout` | seconds to wait for the plots to settle (default 45) |
 | `--config` | JSON file replacing coordinates from `config.json` |
@@ -125,6 +137,35 @@ the screen to stop changing instead of trusting the clock.
 | plots look identical after a change | `Ctrl+D` doesn't recompute | use `Shift+F5` (`Run System and Auto Plot`) |
 
 More, with symptoms and root causes: `references/pitfalls.md`.
+
+## Extending it to your own system
+
+Nothing is hard-coded about *this* FM example except one JSON file. A **system
+profile** (`systems/*.json`) declares which dialog to open, where the tokens sit
+on the canvas, and which parameter labels map to which name:
+
+```bash
+cp systems/_template.json systems/my-system.json     # fill in, then:
+python scripts/sim.py --file my.svu --print-profile  # resolves without touching the GUI
+python scripts/sim.py --file my.svu --set carrier=5000 --out out
+```
+
+`sim.py` auto-matches a profile by substring against the file name (longest
+match wins); files starting with `_` are ignored, which is why the template
+never matches by accident. Dialog fields are located **by their label text**
+(`Amplitude (v)` → `"Amplitude"`), not by pixel order, so a dialog may move and
+still be found.
+
+Three recipes — add a profile, add a second device dialog, add a new step such
+as export — plus the full `sv.py` primitive contract are in
+[`docs/extending.md`](docs/extending.md).
+
+## Search terms
+
+`SystemView` · `ELANIX SystemView 5.0` · `SysVu_32` · `.svu` · `通信原理课程设计` ·
+`调频` / `FM modulation` · `信号与系统 仿真` · `仿真自动化` · `GUI automation` ·
+`Windows GUI RPA` · `PyAutoGUI alternative` · `pywinauto alternative` ·
+`no-COM legacy app automation` · `agent skill` · `Claude Skill`
 
 ## Limits
 
