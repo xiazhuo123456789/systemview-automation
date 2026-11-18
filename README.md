@@ -87,6 +87,38 @@ cp -r systemview-automation <project>/.claude/skills/
 [`docs/integrations.md`](docs/integrations.md)：三层接入方式（纯 CLI → Skills 目录
 → 函数封装）和一份现成的 JSON schema，适配层通常 20 行以内。
 
+## 作为 MCP 服务器使用（已内置，零依赖）
+
+`scripts/mcp_server.py` 是一个自带实现的 MCP server（stdio + JSON-RPC，不装任何
+SDK），任何支持 MCP 的客户端都能直接连：Claude Desktop、Claude Code、Cursor、
+Cline、Zed、Continue、自研 agent。
+
+在客户端的配置里加一段即可（路径换成你 clone 下来的位置）：
+
+```json
+{
+  "mcpServers": {
+    "systemview": {
+      "command": "python",
+      "args": ["E:\\path\\to\\systemview-automation\\scripts\\mcp_server.py"]
+    }
+  }
+}
+```
+
+| 工具 | 作用 | 主要参数 |
+|---|---|---|
+| `systemview_run` | 打开 `.svu` → 改器件参数 → 跑仿真 → 截图，返回路径 + 内嵌图片 | `file`（必填）、`set`、`out`、`timeout`、`zoom` |
+| `systemview_inspect` | 只读：列出正在运行的 SystemView 窗口；给了 `file` 还会返回 token 清单 | `file`（可选） |
+| `systemview_screenshot` | 只截图、不跑仿真；`kind=design` 可抓设计画布 | `title`、`kind`、`out`、`name` |
+
+工具返回的是标准 MCP `content`：一段 JSON 文本 + 一张 PNG（`image` block），
+所以模型能直接"看到"图，而不是只拿到文件路径。手工检查连通性：
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python scripts/mcp_server.py
+```
+
 ## 用法
 
 ```bash

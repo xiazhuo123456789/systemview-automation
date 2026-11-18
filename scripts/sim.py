@@ -302,6 +302,25 @@ def step_params(cfg: dict, values: dict, log, want: str = "") -> int:
         click(tx + dx, ty + dy)          # "Edit Parameters..." — first menu item
         dlg = wait_window(cfg["title_param"], 6)
         if not dlg:
+            # One retry: a token can sit a few pixels away from where the
+            # profile says it is (dragged, or the canvas scrolled by one line),
+            # and a right-click that lands on empty canvas or on a wire simply
+            # opens nothing. Nudge the point and try once more before giving up.
+            log("  dialog did not open; retrying with a small offset")
+            sv.key(0x1B)
+            time.sleep(0.3)
+            for ox, oy in ((0, 5), (5, 0), (-5, 0), (0, -5)):
+                click(tx + ox, ty + oy)
+                click(tx + ox, ty + oy, button="right")
+                time.sleep(0.45)
+                click(tx + ox + dx, ty + oy + dy)
+                dlg = wait_window(cfg["title_param"], 3)
+                if dlg:
+                    log(f"  opened after offset ({ox:+d},{oy:+d})")
+                    break
+                sv.key(0x1B)
+                time.sleep(0.2)
+        if not dlg:
             # Turn an opaque miss into something the operator can act on: the
             # screenshot shows where the canvas actually is, and the hint names
             # the tool that re-measures the token coordinates.

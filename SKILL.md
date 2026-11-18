@@ -65,12 +65,14 @@ call reliable and to explain what the resulting picture can and cannot prove.
 | Path | Purpose |
 |---|---|
 | `scripts/sim.py` | one-command pipeline (open → set → run → capture) |
+| `scripts/mcp_server.py` | MCP server (stdio JSON-RPC): run / inspect / screenshot |
 | `scripts/sv.py` | window/click/screenshot primitives |
 | `scripts/openfile.py` | drive the Win32 open dialog |
 | `scripts/token_status.py` | batch-read token types off the status bar |
 | `references/layout.md` | token map, coordinates, window semantics |
 | `references/params.md` | dialog fields, math, "can you see FM" criteria |
-| `references/pitfalls.md` | 17 failure modes with fixes |
+| `references/pitfalls.md` | 22 failure modes with fixes |
+| `docs/integrations.md` | how any agent (CLI / skills dir / MCP) plugs in |
 | `screenshots/` | what a real `sim.py` run produces (used by `README.md`) |
 | `tools/` | manual recovery helpers, **not** part of the normal flow |
 

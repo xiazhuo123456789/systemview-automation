@@ -48,8 +48,39 @@ python scripts/sim.py --file "D:\lab\demo.svu" --set carrier=5000 --set mod_gain
 
 ## 第 2 层：包成函数 / MCP 工具
 
-要做成 OpenAI function calling、LangChain tool、MCP server 或自研插件，只需要
-把 `sim.py` 包一层，参数一一对应：
+**MCP 已经写好了，不用自己包**：`scripts/mcp_server.py` 是自带实现的 MCP
+server（stdio + JSON-RPC 2.0，零依赖），暴露三个工具：
+
+| 工具 | 作用 |
+|---|---|
+| `systemview_run` | 打开 `.svu` → 改参数 → 跑仿真 → 截图，返回 JSON + 内嵌 PNG |
+| `systemview_inspect` | 只读：正在运行的窗口列表；给了 `file` 还返回 token 清单 |
+| `systemview_screenshot` | 只截图不跑仿真，`kind=design` 可抓设计画布 |
+
+客户端配置（Claude Desktop / Cursor / Cline / Zed / Continue 都是这个形状）：
+
+```json
+{
+  "mcpServers": {
+    "systemview": {
+      "command": "python",
+      "args": ["E:\\path\\to\\systemview-automation\\scripts\\mcp_server.py"]
+    }
+  }
+}
+```
+
+返回值是标准 MCP `content` 数组：一段 JSON 文本 + 一张 `image` block（base64
+PNG），所以模型能直接看到图。手工验证：
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python scripts/mcp_server.py
+```
+
+---
+
+如果只想自己做 function calling / LangChain tool，把 `sim.py` 包一层即可，
+参数一一对应：
 
 ```json
 {

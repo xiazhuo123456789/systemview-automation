@@ -3,6 +3,23 @@
 All notable changes to this skill. Format: [Keep a Changelog](https://keepachangelog.com/),
 versioning: [SemVer](https://semver.org/).
 
+## [2.0.3] — 2026-11-18
+
+### Added
+
+- `scripts/mcp_server.py`：自带实现的 MCP 服务器（stdio + JSON-RPC 2.0，零依赖），
+  三个工具 `systemview_run` / `systemview_inspect` / `systemview_screenshot`，
+  返回标准 MCP `content`（JSON 文本 + 内嵌 PNG `image` block），任何支持 MCP 的
+  客户端（Claude Desktop、Claude Code、Cursor、Cline、Zed、Continue、自研 agent）
+  可直接连接，无需再自己包适配层。
+- `README.md` 新增「作为 MCP 服务器使用」段（客户端配置 JSON + 三个工具的表格）。
+- `docs/integrations.md` 第 2 层改写为「MCP 已内置」，并保留自定义 function calling
+  的 JSON schema 作为备选。
+
+### Changed
+
+- `docs/integrations.md` 不再暗示需要自己实现 MCP 适配。
+
 ## [2.0.2] — 2026-11-18
 
 ### Changed
