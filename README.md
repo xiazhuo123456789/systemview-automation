@@ -214,6 +214,24 @@ python scripts/sim.py --file my.svu --set carrier=5000 --out out
 三条扩展配方（加 profile、加第二个器件对话框、加导出之类的新步骤）以及
 `sv.py` 全部原语的契约，见 [`docs/extending.md`](docs/extending.md)。
 
+## 换一台机器、换一个版本：让它自己检测
+
+代码里**没有**"如果版本是 X 就……"的分支——版本矩阵注定过期，而我只见过 5.0。
+换机器或换版本时，不要改代码，先跑一次自检：
+
+```bash
+python scripts/probe.py --out probe --json probe.json
+```
+
+它只读不点：列出 `SystemView*` 窗口、读画布原点与 `.exe` 文件版本、抓
+`probe/design.png`（用来核对 token 有没有挪位）、`probe/token_status.png`
+（用来确认"点下去真的点到了 token"，因为状态栏是 VB 自绘、读不到文本）。
+`checks[].ok=false` 的条目就是要人工看一眼的地方。
+
+五步完整流程、每个版本可能变的东西（窗口类名、画布原点、运行快捷键、
+保存提示按钮文本）以及"点空了 / 显示旧图"的排查，见
+[`references/versions.md`](references/versions.md)。
+
 ## 检索关键词 / Search terms
 
 `SystemView` · `ELANIX SystemView 5.0` · `SysVu_32` · `.svu` · `通信原理课程设计` ·
