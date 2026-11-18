@@ -160,4 +160,20 @@ WM_COMMAND`、`PostMessage WM_COMMAND`、真实鼠标）全部无效——因为
 **解法**：截图时用 `sv.hold_front()` 抬窗而**不要 resize**；需要时间窗时在跑完之后
 再用橡皮筋框选（`--zoom`），或让 profile 的 `capture.zoom` 生效。
 
+## 22. 别按窗口标题批量关窗，先按进程分清"这是谁"
+
+**症状**：一次"清理空白窗口"把标题为 `SystemView by ELANIX` 的主框架关掉，
+SystemView 打印 `Releasing resources and closing SystemView...` 后整体退出，
+里面打开的文档窗口全部消失（`.svu` 文件本身没坏，但视图没了）。
+
+**原因**：SystemView 是**单实例多窗口**的 VB6 MDI 程序，`SystemView by ELANIX`
+既可能是没打开文档的空壳，也可能是正在承载你所有 MDI 子窗的主框架——只看标题分不出来。
+另外每次 `Popen` 启动都会留下 `ThunderRT6Main`（0 尺寸）与空白 `ThunderRT6FormDC`。
+
+**解法**：先用 `python tools/_winmap.py` 把每个窗口和它的**进程号**列出来，
+只对确认是自己启动的、且不含任何 `SystemView - <路径>.svu` 文档窗的进程做
+`Stop-Process -Id <pid>`；**永远不要**用标题匹配去 `WM_CLOSE` 主框架。
+本次事故留下的经验值：孤儿实例的特征是"只有一个空白 `SystemView by ELANIX` +
+一个 `Recent SystemView Files` + 一个 0 尺寸 `ThunderRT6Main`"。
+
 

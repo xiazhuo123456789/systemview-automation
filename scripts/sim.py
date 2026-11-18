@@ -390,6 +390,7 @@ def step_run(cfg: dict, out_dir: str, timeout: float, log, want: str = "") -> in
 def step_capture(cfg: dict, out_dir: str, tag: str, zoom, log):
     os.makedirs(out_dir, exist_ok=True)
     full = os.path.join(out_dir, f"{tag}-full.png")
+    clean = os.path.join(out_dir, f"{tag}.png")
     # Raise the analysis window first: a full-screen grab would otherwise record
     # whatever the user happened to have in front, and the crop below would cut
     # the wrong pixels.
@@ -403,27 +404,47 @@ def step_capture(cfg: dict, out_dir: str, tag: str, zoom, log):
         win = find(cfg["title_analysis"])
     try:
         shot(full)
+        if zoom:
+            # The modulated-wave plot is its own child window ("w2: Sink 11"), so
+            # its rectangle is measured, never assumed: the parent window moves.
+            plot = sv.find_child(win[0]["hwnd"], cfg.get("title_w2", "w2:"))
+            if plot:
+                l, t, r, b = plot[0]["rect"]
+                span = float(cfg.get("time_span", 1.34))   # seconds across the axis
+                left, right = l + 60, r - 20               # inside the plot frame
+                mid = (zoom[0] + zoom[1]) / 2.0
+                axis = (0.0, span)                         # the axis starts at full span
+                # A four-millisecond window is three pixels wide on a 1.3-second
+                # axis, and a three-pixel drag is not a reliable rubber band.
+                # Narrow down in steps, re-mapping the axis after each drag.
+                for margin in (0.030, 0.010, 0.003):
+                    half = (zoom[1] - zoom[0]) / 2.0 + margin
+                    lo, hi = max(axis[0], mid - half), min(axis[1], mid + half)
+                    if hi <= lo:
+                        break
+                    x0 = int(left + (right - left) * (lo - axis[0]) / (axis[1] - axis[0]))
+                    x1 = int(left + (right - left) * (hi - axis[0]) / (axis[1] - axis[0]))
+                    drag(x0, t + 60, max(x1, x0 + 2), b - 55)
+                    time.sleep(0.8)
+                    axis = (lo, hi)
+                time.sleep(0.6)
+                shot(full)
+            else:
+                log("  WARNING: w2 plot window not found; skipping the zoom")
     finally:
         if win:
             sv.release_front(win[0]["hwnd"])
     made = [full]
-    if zoom and win:
-        l, t, r, b = cfg["crop_w2"]
-        x0, y0 = int(l + 60), int(t + 95)
-        x1, y1 = int(r - 20), int(b - 90)
-        drag(x0, y0, x1, y1)
-        time.sleep(1.2)
-        shot(full)
+    # The clean image comes from the window itself, so the taskbar, other apps
+    # and any popup on screen never appear in it.
     if win:
-        box = tuple(win[0]["rect"])
-        crop = os.path.join(out_dir, f"{tag}.png")
         try:
-            from PIL import Image
-            with Image.open(full) as im:
-                im.crop(box).save(crop)
-            made.append(crop)
+            ok, w, h = sv.capture_window(win[0]["hwnd"], clean)
+            made.append(clean)
+            if not ok:
+                log("  WARNING: PrintWindow returned 0; the window may be hidden")
         except Exception as exc:                      # pragma: no cover
-            log(f"  WARNING: crop failed ({exc}); keeping the full screenshot")
+            log(f"  WARNING: window capture failed ({exc}); keeping the screen grab")
     log(f"captured: {full}")
     return made
 

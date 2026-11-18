@@ -71,7 +71,7 @@ call reliable and to explain what the resulting picture can and cannot prove.
 | `references/layout.md` | token map, coordinates, window semantics |
 | `references/params.md` | dialog fields, math, "can you see FM" criteria |
 | `references/pitfalls.md` | 17 failure modes with fixes |
-| `examples/` | a real capture produced by `sim.py` |
+| `screenshots/` | what a real `sim.py` run produces (used by `README.md`) |
 | `tools/` | manual recovery helpers, **not** part of the normal flow |
 
 Details are in `references/` — read only the file you need.

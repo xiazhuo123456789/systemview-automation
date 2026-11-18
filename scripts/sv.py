@@ -49,6 +49,40 @@ def enum_windows():
     return out
 
 
+def find_child(parent, sub, cls=None):
+    """Like find(), but only among the descendants of one window.
+
+    Each analysis plot lives in its own MDI child window, so a plot title never
+    turns up in the top-level enumeration. The rectangles are still screen
+    coordinates, so a caller can click them directly.
+    """
+    out = []
+
+    def _info(hwnd):
+        n = user32.GetWindowTextLengthW(hwnd)
+        title = ''
+        if n:
+            buf = ctypes.create_unicode_buffer(n + 1)
+            user32.GetWindowTextW(hwnd, buf, n + 1)
+            title = buf.value
+        cls_name = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(hwnd, cls_name, 256)
+        return title, cls_name.value
+
+    @ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+    def _cb(hwnd, _):
+        title, cls_name = _info(hwnd)
+        if sub.lower() in title.lower() and (cls is None or cls == cls_name):
+            r = wt.RECT()
+            user32.GetWindowRect(hwnd, ctypes.byref(r))
+            out.append({"hwnd": hwnd, "cls": cls_name, "title": title,
+                        "rect": [r.left, r.top, r.right, r.bottom]})
+        return True
+
+    user32.EnumChildWindows(parent, _cb, 0)
+    return out
+
+
 def find(sub, cls=None):
     hits = [w for w in enum_windows() if sub in w['title'] and (cls is None or w['cls'] == cls)]
     return hits
@@ -124,6 +158,56 @@ def focus(hwnd):
     user32.ShowWindow(hwnd, SW_RESTORE)
     bring_to_front(hwnd)
     time.sleep(0.3)
+
+
+def capture_window(hwnd, path):
+    """Save one window's own pixels with PrintWindow (no taskbar, no overlays).
+
+    ImageGrab records the screen, so anything on top of the window leaks into
+    the picture; PrintWindow asks the window to paint itself into a memory
+    bitmap instead. SystemView is plain GDI, but PW_RENDERFULLCONTENT (2) is
+    needed anyway for windows composited by DWM.
+    """
+    import ctypes
+    from ctypes import wintypes as wt
+    from PIL import Image
+
+    class BIH(ctypes.Structure):
+        _fields_ = [("biSize", wt.DWORD), ("biWidth", wt.LONG), ("biHeight", wt.LONG),
+                    ("biPlanes", wt.WORD), ("biBitCount", wt.WORD), ("biCompression", wt.DWORD),
+                    ("biSizeImage", wt.DWORD), ("biXPelsPerMeter", wt.LONG),
+                    ("biYPelsPerMeter", wt.LONG), ("biClrUsed", wt.DWORD),
+                    ("biClrImportant", wt.DWORD)]
+
+    rect = wt.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    w, h = rect.right - rect.left, rect.bottom - rect.top
+    if w <= 0 or h <= 0:
+        raise RuntimeError(f"window {hwnd} has no size ({w}x{h})")
+    gdi32 = ctypes.windll.gdi32
+    hdc = user32.GetWindowDC(hwnd)
+    mem = gdi32.CreateCompatibleDC(hdc)
+    bmp = gdi32.CreateCompatibleBitmap(hdc, w, h)
+    gdi32.SelectObject(mem, bmp)
+    ok = user32.PrintWindow(hwnd, mem, 2)
+    bi = BIH()
+    bi.biSize, bi.biWidth, bi.biHeight = ctypes.sizeof(BIH), w, -h
+    bi.biPlanes, bi.biBitCount = 1, 32
+    buf = ctypes.create_string_buffer(w * h * 4)
+    gdi32.GetDIBits(mem, bmp, 0, h, buf, ctypes.byref(bi), 0)
+    gdi32.DeleteObject(bmp)
+    gdi32.DeleteDC(mem)
+    user32.ReleaseDC(hwnd, hdc)
+    img = Image.frombuffer("RGBA", (w, h), buf, "raw", "BGRA", 0, 1).convert("RGB")
+    # A window can be reported larger than it paints (ownerdraw frames, or a
+    # stale rect while maximized); the untouched margin comes back pure black.
+    from PIL import ImageChops
+    bg = Image.new("RGB", img.size, (0, 0, 0))
+    bbox = ImageChops.difference(img, bg).getbbox()
+    if bbox and (bbox[2] - bbox[0]) > 200 and (bbox[3] - bbox[1]) > 200:
+        img = img.crop(bbox)
+    img.save(path)
+    return bool(ok), img.width, img.height
 
 
 def shot(path):

@@ -6,13 +6,35 @@
   "title_param": "FM/VCO",
   "title_analysis": "SystemView Analysis",
   "tokens": {
-    "0": [142, 468],
-    "1": [381, 477],
-    "5": [264, 477],
-    "7": [490, 575]
+    "0": [
+      142,
+      468
+    ],
+    "1": [
+      381,
+      477
+    ],
+    "5": [
+      264,
+      477
+    ],
+    "7": [
+      490,
+      575
+    ]
   },
-  "menu_file": [21, 37],
-  "menu_open_existing": [110, 177],
-  "param_ok_fallback": [1046, 640],
-  "crop_w2": [18, 690, 940, 1035]
+  "menu_file": [
+    21,
+    37
+  ],
+  "menu_open_existing": [
+    110,
+    177
+  ],
+  "param_ok_fallback": [
+    1046,
+    640
+  ],
+  "time_span": 1.34,
+  "title_w2": "w2:"
 }
